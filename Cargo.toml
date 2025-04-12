@@ -16,7 +16,7 @@ members = [
     "opentelemetry-exporter-geneva/geneva-uploader-ffi",
     "opentelemetry-exporter-geneva/opentelemetry-exporter-geneva",
     "examples/*",
-    "stress",
+    "stress", "opentelemetry-etw-trace",
 ]
 
 resolver = "2"
