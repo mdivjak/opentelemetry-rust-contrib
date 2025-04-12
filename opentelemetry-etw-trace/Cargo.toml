@@ -1,34 +1,23 @@
 [package]
 name = "opentelemetry-etw-trace"
-description = "OpenTelemetry trace exporter to ETW (Event Tracing for Windows)"
+description = "OpenTelemetry logs exporter to ETW (Event Tracing for Windows)"
 version = "0.1.0"
-edition = "2024"
-homepage = "https://github.com/open-telemetry/opentelemetry-rust-contrib/tree/main/opentelemetry-etw-trace"
-repository = "https://github.com/open-telemetry/opentelemetry-rust-contrib/tree/main/opentelemetry-etw-trace"
-readme = "README.md"
-rust-version = "1.75.0"
-keywords = ["opentelemetry", "trace", "etw"]
+edition = "2021"
+homepage = "https://github.com/open-telemetry/opentelemetry-rust-contrib/tree/main/opentelemetry-etw-logs"
+repository = "https://github.com/open-telemetry/opentelemetry-rust-contrib/tree/main/opentelemetry-etw-logs"
 license = "Apache-2.0"
+readme = "README.md"
 
 [dependencies]
-tracelogging = "1.2.1"
-tracelogging_dynamic = "1.2.1"
-opentelemetry = { workspace = true, features = ["trace"] }
-opentelemetry_sdk = { workspace = true, features = ["trace"] }
-futures-executor = "0.3.31"
+opentelemetry = { workspace = true, features = ["logs"] }
+opentelemetry_sdk = { version = "0.29", features = ["logs"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+uuid = { version = "1.3", features = ["v4", "v5"] }
+tracing = "0.1"
 
 [dev-dependencies]
-opentelemetry_sdk = { workspace = true, features = ["trace"] }
-tokio = { version = "1.0", features = ["full"] }
-tracing = { version = "0.1", default-features = false, features = ["std"] }
-tracing-core = "0.1.31"
-tracing-subscriber = { version = "0.3.0", default-features = false, features = [
-    "registry",
-    "std",
-] }
-
-[features]
-default = []
-
-[lints]
-workspace = true
+opentelemetry_sdk = { version = "0.29", features = ["trace"] }
+tracing-opentelemetry = "0.19"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

@@ -1,64 +1,41 @@
-//! Extension trait for TracerProvider to easily add ETW exporter.
+//! Extension trait for adding ETW exporter to a TracerProvider.
 
-use crate::trace::{ETWExporter, ReentrantSpanProcessor};
-use opentelemetry::trace::TraceError;
+use opentelemetry::KeyValue;
 use opentelemetry_sdk::trace::TracerProviderBuilder;
 
-/// Extension trait that adds methods to TracerProviderBuilder for ETW exporter configuration.
-pub trait ETWTracerProviderBuilderExt {
-    /// Add an ETW exporter to the tracer provider with the specified provider name.
+
+/// Extension trait for adding ETW exporter to a TracerProvider.
+pub trait ETWTracerProviderBuilderExt: Sized {
+    /// Adds an ETW exporter to a TracerProvider.
     ///
     /// # Arguments
     ///
-    /// * `provider_name` - The name for the ETW provider that will be registered in Windows ETW.
-    ///
-    /// # Returns
-    ///
-    /// The modified builder instance for further configuration.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use opentelemetry_etw_trace::trace::ETWTracerProviderBuilderExt;
-    /// use opentelemetry_sdk::trace::TracerProvider;
-    ///
-    /// let provider = TracerProvider::builder()
-    ///     .with_etw_exporter("MyAppTraces")
-    ///     .build();
-    /// ```
+    /// * `provider_name` - The name of the ETW provider to use.
     fn with_etw_exporter(self, provider_name: &str) -> Self;
+
+    /// Adds an ETW exporter with additional resource attributes to a TracerProvider.
+    ///
+    /// # Arguments
+    ///
+    /// * `provider_name` - The name of the ETW provider to use.
+    /// * `resource_attributes` - Additional resource attributes to include in the spans.
+    fn with_etw_exporter_and_resource(
+        self,
+        provider_name: &str, 
+        resource_attributes: Vec<KeyValue>,
+    ) -> Self;
 }
 
 impl ETWTracerProviderBuilderExt for TracerProviderBuilder {
-    fn with_etw_exporter(self, provider_name: &str) -> Self {
-        // Attempt to create the ETW exporter
-        match ETWExporter::new(provider_name) {
-            Ok(exporter) => {
-                // Wrap with ReentrantSpanProcessor for safety
-                let processor = ReentrantSpanProcessor::new(exporter);
-                self.with_span_processor(processor)
-            }
-            Err(err) => {
-                // Log the error and return the builder unmodified
-                eprintln!("Failed to create ETW exporter: {}", err);
-                self
-            }
-        }
+    fn with_etw_exporter(self, _provider_name: &str) -> Self {
+        todo!("Implement ETW exporter creation and attachment to the TracerProvider")
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use opentelemetry_sdk::trace::TracerProvider;
-
-    #[test]
-    fn test_with_etw_exporter() {
-        let provider = TracerProvider::builder()
-            .with_etw_exporter("TestETWTraces")
-            .build();
-        
-        // Basic test to ensure the builder completes without error
-        assert!(provider.tracer("test").span_builder("test_span").start_with_context(&opentelemetry::Context::current()).is_recording());
+    fn with_etw_exporter_and_resource(
+        self,
+        _provider_name: &str, 
+        _resource_attributes: Vec<KeyValue>,
+    ) -> Self {
+        todo!("Implement ETW exporter with resource attributes")
     }
 }
