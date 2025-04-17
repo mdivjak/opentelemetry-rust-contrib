@@ -3,7 +3,10 @@
 use std::fmt::Debug;
 use std::pin::Pin;
 use std::sync::Arc;
+use opentelemetry_sdk::{error::OTelSdkResult, trace::{SpanData, SpanExporter, TraceError}};
 use tracelogging_dynamic as tld;
+use async_trait::async_trait;
+use futures_core::future::BoxFuture;
 
 #[derive(Default)]
 pub(crate) struct Resource {
@@ -35,6 +38,23 @@ impl ETWExporter {
         }
     }
     // shutdown will be implemented as part of the SpanExporter trait later
+}
+
+#[async_trait]
+impl SpanExporter for ETWExporter {
+    fn export(
+        &self,
+        _batch: Vec<SpanData>,
+    ) -> impl std::future::Future<Output = OTelSdkResult> + Send {
+        // Implementation will be added later
+        Box::pin(async { Ok(()) })
+    }
+
+    fn shutdown(&mut self) -> OTelSdkResult {
+        let _res = self.provider.as_ref().unregister();
+        
+        Ok(())
+    }
 }
 
 pub struct EtwTraceExporter {
