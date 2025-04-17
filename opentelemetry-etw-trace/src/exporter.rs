@@ -22,6 +22,21 @@ impl Debug for ETWExporter {
     }
 }
 
+impl ETWExporter {
+    pub(crate) fn new(provider_name: &str) -> Self {
+        let options = tld::Provider::options();
+        let provider = Arc::pin(tld::Provider::new(provider_name, &options));
+        unsafe {
+            provider.as_ref().register();
+        }
+        Self {
+            provider,
+            resource: Resource::default(),
+        }
+    }
+    // shutdown will be implemented as part of the SpanExporter trait later
+}
+
 pub struct EtwTraceExporter {
     // Fields for configuration and state will go here
 }
