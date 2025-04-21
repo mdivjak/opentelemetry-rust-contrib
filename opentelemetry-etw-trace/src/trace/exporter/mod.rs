@@ -1,86 +1,109 @@
-//! ETW Span Exporter implementation.
+use std::{pin::Pin, sync::Arc};
+use opentelemetry::Key;
+use opentelemetry_sdk::{error::OTelSdkError, trace::{SpanData, SpanExporter}};
+use tracelogging_dynamic as tld;
+use std::fmt::Debug;
 
-use opentelemetry::{
-    trace::{SpanContext, SpanKind, Status},
-    Key, KeyValue,
-};
-use std::{collections::HashMap, sync::Mutex};
-
-mod common;
 mod part_a;
 mod part_b;
 mod part_c;
 
-use common::*;
-use part_a::PartA;
-use part_b::PartB;
-use part_c::PartC;
-
-/// A span exporter that writes spans to ETW.
-#[derive(Debug)]
-pub struct ETWSpanExporter {
-    provider_name: String,
-    provider_guid: uuid::Uuid,
-    resource_attributes: Vec<KeyValue>,
-    // ETW provider handle would be stored here
-    provider_handle: Mutex<Option<u64>>,
+#[derive(Default)]
+struct Resource {
+    pub cloud_role: Option<String>,
+    pub cloud_role_instance: Option<String>,
 }
 
-impl ETWSpanExporter {
-    /// Creates a new ETW span exporter.
-    ///
-    /// # Arguments
-    ///
-    /// * `provider_name` - The name of the ETW provider to use.
-    /// * `resource_attributes` - Resource attributes to include in the spans.
-    pub fn new(provider_name: &str, resource_attributes: Vec<KeyValue>) -> Self {
-        todo!("Implement ETWSpanExporter::new")
+pub(crate) struct ETWExporter {
+    provider: Pin<Arc<tld::Provider>>,
+    resource: Resource,
+}
+
+fn enabled_callback_noop(
+    _source_id: &tld::Guid,
+    _event_control_code: u32,
+    _level: tld::Level,
+    _match_any_keyword: u64,
+    _match_all_keyword: u64,
+    _filter_data: usize,
+    _callback_context: usize,
+) {
+    // Unused callback.
+}
+
+impl ETWExporter {
+    const KEYWORD: u64 = 1;
+
+    pub(crate) fn new(provider_name: &str) -> Self {
+        let mut options = tld::Provider::options();
+
+        options.callback(enabled_callback_noop, 0x0);
+        let provider = Arc::pin(tld::Provider::new(provider_name, &options));
+        // SAFETY: tracelogging (ETW) enables an ETW callback into the provider when `register()` is called.
+        // This might crash if the provider is dropped without calling unregister before.
+        // This only affects static providers.
+        // On dynamically created providers, the lifetime of the provider is tied to the object itself, so `unregister()` is called when dropped.
+        unsafe {
+            provider.as_ref().register();
+        }
+
+        ETWExporter {
+            provider,
+            resource: Default::default(),
+        }
     }
 
-    /// Registers the ETW provider.
-    fn register_provider(&self) -> Result<u64, ETWExporterError> {
-        todo!("Implement register_provider")
+    fn enabled(&self, level: tld::Level) -> bool {
+        // On unit tests, we skip this check to be able to test the exporter as no provider is active.
+        if cfg!(test) {
+            return true;
+        }
+
+        self.provider.enabled(level, Self::KEYWORD)
     }
 
-    /// Exports a span to ETW.
-    ///
-    /// # Arguments
-    ///
-    /// * `span_context` - The context of the span to export.
-    /// * `span_name` - The name of the span.
-    /// * `span_kind` - The kind of the span.
-    /// * `status` - The status of the span.
-    /// * `start_time` - The start time of the span.
-    /// * `end_time` - The end time of the span.
-    /// * `attributes` - The attributes of the span.
-    /// * `parent_span_id` - The ID of the parent span, if any.
-    pub fn export_span(
+    pub(crate) fn export_trace_data(
         &self,
-        span_context: &SpanContext,
-        span_name: &str,
-        span_kind: SpanKind,
-        status: Status,
-        start_time: std::time::SystemTime,
-        end_time: std::time::SystemTime,
-        attributes: &[KeyValue],
-        parent_span_id: Option<String>,
-    ) -> Result<(), ETWExporterError> {
-        todo!("Implement export_span")
+        _span: Vec<SpanData>,
+    ) -> opentelemetry_sdk::error::OTelSdkResult {
+        todo!("implement trace data export");
     }
 }
 
-/// Errors that can occur when exporting spans to ETW.
-#[derive(Debug, thiserror::Error)]
-pub enum ETWExporterError {
-    /// Failed to register ETW provider.
-    #[error("Failed to register ETW provider: {0}")]
-    ProviderRegistrationError(String),
+impl Debug for ETWExporter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ETW trace exporter")
+    }
+}
 
-    /// Failed to write ETW event.
-    #[error("Failed to write ETW event: {0}")]
-    EventWriteError(String),
-
-    /// Other error.
-    #[error("Other error: {0}")]
-    Other(String),
+impl SpanExporter for ETWExporter {
+    async fn export(
+        &self,
+        batch: Vec<opentelemetry_sdk::trace::SpanData>,
+    ) -> Result<(), opentelemetry_sdk::error::OTelSdkError> {
+        self.export_trace_data(batch)
+    }
+    
+    fn shutdown(&mut self) -> opentelemetry_sdk::error::OTelSdkResult {
+        let res = self.provider.as_ref().unregister();
+        if res != 0 {
+            return Err(OTelSdkError::InternalFailure(format!(
+                "Failed to unregister provider. Win32 error: {res}"
+            )));
+        }
+        Ok(())
+    }
+    
+    fn force_flush(&mut self) -> opentelemetry_sdk::error::OTelSdkResult {
+        todo!()
+    }
+    
+    fn set_resource(&mut self, resource: &opentelemetry_sdk::Resource) {
+        self.resource.cloud_role = resource
+            .get(&Key::from_static_str("service.name"))
+            .map(|v| v.to_string());
+        self.resource.cloud_role_instance = resource
+            .get(&Key::from_static_str("service.instance.id"))
+            .map(|v| v.to_string());
+    }
 }

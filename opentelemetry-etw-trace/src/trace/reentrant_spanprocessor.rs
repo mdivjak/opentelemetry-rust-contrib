@@ -1,44 +1,49 @@
 //! Reentrant span processor implementation for ETW.
 
 use opentelemetry::Context;
-use opentelemetry_sdk::trace::SpanProcessor;
-use std::sync::Arc;
+use opentelemetry_sdk::{trace::{SpanExporter, SpanProcessor}, Resource};
 
-use crate::trace::ETWSpanExporter;
+use super::exporter::ETWExporter;
 
 /// A reentrant span processor that exports spans to ETW.
 /// This processor is designed to be reentrant, which means it can handle
 /// nested spans and avoid deadlocks.
 #[derive(Debug)]
 pub struct ReentrantSpanProcessor {
-    _exporter: Arc<ETWSpanExporter>,
+    event_exporter: ETWExporter,
 }
 
 impl ReentrantSpanProcessor {
-    /// Creates a new reentrant span processor with the given exporter.
-    ///
-    /// # Arguments
-    ///
-    /// * `exporter` - The ETW span exporter to use.
-    pub fn new(_exporter: Arc<ETWSpanExporter>) -> Self {
-        todo!("Implement ReentrantSpanProcessor::new")
+    /// constructor
+    pub fn new(provider_name: &str) -> Self {
+        let exporter = ETWExporter::new(provider_name);
+        ReentrantSpanProcessor {
+            event_exporter: exporter,
+        }
     }
 }
 
 impl SpanProcessor for ReentrantSpanProcessor {
     fn on_start(&self, _span: &mut opentelemetry_sdk::trace::Span, _cx: &Context) {
-        todo!()
+        // No action needed on start.
     }
 
-    fn on_end(&self, _span: opentelemetry_sdk::trace::SpanData) {
-        todo!()
+    fn on_end(&self, span: opentelemetry_sdk::trace::SpanData) {
+        let _ = futures_executor::block_on(self.event_exporter.export(vec![span]));
     }
 
     fn force_flush(&self) -> opentelemetry_sdk::error::OTelSdkResult {
-        todo!()
+        Ok(())
     }
 
     fn shutdown(&self) -> opentelemetry_sdk::error::OTelSdkResult {
         todo!()
+        // This does not work due to &mut self and &self conflict.
+        //self.event_exporter.shutdown()
     }
+
+    fn set_resource(&mut self, _resource: &Resource) {
+        self.event_exporter.set_resource(_resource);
+    }
+
 }
