@@ -62,9 +62,9 @@ impl ETWExporter {
         self.provider.enabled(level, Self::KEYWORD)
     }
 
-    pub(crate) fn export_trace_data(
+    pub(crate) fn export_span_data(
         &self,
-        _span: Vec<SpanData>,
+        _span: &SpanData,
     ) -> opentelemetry_sdk::error::OTelSdkResult {
         todo!("implement trace data export");
     }
@@ -81,7 +81,7 @@ impl SpanExporter for ETWExporter {
         &self,
         batch: Vec<opentelemetry_sdk::trace::SpanData>,
     ) -> Result<(), opentelemetry_sdk::error::OTelSdkError> {
-        self.export_trace_data(batch)
+        batch.iter().try_for_each(|span| self.export_span_data(span))
     }
     
     fn shutdown(&mut self) -> opentelemetry_sdk::error::OTelSdkResult {

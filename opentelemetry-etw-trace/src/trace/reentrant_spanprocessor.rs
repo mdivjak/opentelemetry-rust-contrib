@@ -1,5 +1,7 @@
 //! Reentrant span processor implementation for ETW.
 
+use std::sync::{Arc, Mutex};
+
 use opentelemetry::Context;
 use opentelemetry_sdk::{trace::{SpanExporter, SpanProcessor}, Resource};
 
@@ -10,7 +12,7 @@ use super::exporter::ETWExporter;
 /// nested spans and avoid deadlocks.
 #[derive(Debug)]
 pub struct ReentrantSpanProcessor {
-    event_exporter: ETWExporter,
+    event_exporter: Arc<Mutex<ETWExporter>>,
 }
 
 impl ReentrantSpanProcessor {
@@ -18,7 +20,7 @@ impl ReentrantSpanProcessor {
     pub fn new(provider_name: &str) -> Self {
         let exporter = ETWExporter::new(provider_name);
         ReentrantSpanProcessor {
-            event_exporter: exporter,
+            event_exporter: Arc::new(Mutex::new(exporter)),
         }
     }
 }
@@ -29,21 +31,31 @@ impl SpanProcessor for ReentrantSpanProcessor {
     }
 
     fn on_end(&self, span: opentelemetry_sdk::trace::SpanData) {
-        let _ = futures_executor::block_on(self.event_exporter.export(vec![span]));
+        if let Ok(exporter) = self.event_exporter.lock() {
+            let _ = futures_executor::block_on(exporter.export(vec![span]));
+        }
     }
 
     fn force_flush(&self) -> opentelemetry_sdk::error::OTelSdkResult {
-        Ok(())
+        if let Ok(mut exporter) = self.event_exporter.lock() {
+            exporter.force_flush()
+        } else {
+            Ok(())
+        }
     }
 
     fn shutdown(&self) -> opentelemetry_sdk::error::OTelSdkResult {
-        todo!()
-        // This does not work due to &mut self and &self conflict.
-        //self.event_exporter.shutdown()
+        if let Ok(mut exporter) = self.event_exporter.lock() {
+            exporter.shutdown()
+        } else {
+            Ok(())
+        }
     }
 
     fn set_resource(&mut self, _resource: &Resource) {
-        self.event_exporter.set_resource(_resource);
+        if let Ok(mut exporter) = self.event_exporter.lock() {
+            exporter.set_resource(_resource);
+        }
     }
 
 }
